@@ -249,11 +249,11 @@ class RewardsCfg:
     # -- task
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=1.0,
+        weight=3.0,
         params={"command_name": "base_velocity", "std": math.sqrt(0.25)},
     )
     track_ang_vel_z = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_ang_vel_z_exp, weight=2.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
 
     alive = RewTerm(func=mdp.is_alive, weight=0.15)
@@ -269,7 +269,7 @@ class RewardsCfg:
 
     joint_deviation_arms = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.1,
+        weight=-0.5,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -283,7 +283,7 @@ class RewardsCfg:
     )
     joint_deviation_waists = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-1,
+        weight=-2.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -295,18 +295,24 @@ class RewardsCfg:
     )
     joint_deviation_legs = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-1.0,
+        weight=-2.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_roll_joint", ".*_hip_yaw_joint"])},
     )
 
     # -- robot
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-5.0)
-    base_height = RewTerm(func=mdp.base_height_l2, weight=-10, params={"target_height": 0.78},"sensor_cfg": SceneEntityCfg("height_scanner")})
-
+    base_height = RewTerm(
+        func=mdp.base_height_l2,
+        weight=-10,
+        params={
+            "target_height": 0.78,
+            "sensor_cfg": SceneEntityCfg("height_scanner"),
+        },
+    )
     # -- feet
     gait = RewTerm(
         func=mdp.feet_gait,
-        weight=0.5,
+        weight=0.0,
         params={
             "period": 0.8,
             "offset": [0.0, 0.5],
@@ -335,7 +341,7 @@ class RewardsCfg:
     )
     
     feet_air_time = RewTerm(
-        func=mdp.feet_air_time_positive_biped, wright=0.5,
+        func=mdp.feet_air_time_positive_biped, weight=0.5,
         params={"command_name":"base_velocity",
         "sensor_cfg":SceneEntityCfg("contact_forces",body_names=".*_ankle_roll_link"),
         "threshold":0.5},
@@ -360,9 +366,17 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    base_height = DoneTerm(func=mdp.root_height_below_minimum, params={"minimum_height": 0.2})
-    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 0.8})
-
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 1.0})
+    illegal_reset_contact = DoneTerm(func=mdp.illegal_reset_contact,
+                                        time_out=True,
+                                        params={
+                                        "sensor_cfg": SceneEntityCfg("contact_forces", body_names=
+                                        ["torso_link"]),
+                                        "threshold": 1.0,
+                                        "episode_length_threshold": 5,
+                                        "print_reason": False,
+                                        },
+                                        )
 
 @configclass
 class CurriculumCfg:
@@ -373,7 +387,7 @@ class CurriculumCfg:
 
 
 @configclass
-class RobotEnvCfg(ManagerBasedRLEnvCfg):
+class G1RoughEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
@@ -415,7 +429,7 @@ class RobotEnvCfg(ManagerBasedRLEnvCfg):
 
 
 @configclass
-class RobotPlayEnvCfg(RobotEnvCfg):
+class G1RoughPlayEnvCfg(G1RoughEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.scene.num_envs = 32
