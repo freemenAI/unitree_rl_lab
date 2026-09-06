@@ -302,7 +302,7 @@ class RewardsCfg:
     # -- robot
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-5.0)
     base_height = RewTerm(
-        func=mdp.base_height_l2,
+        func=mdp.base_height_l2_valid_rays,
         weight=-10,
         params={
             "target_height": 0.78,
@@ -330,12 +330,14 @@ class RewardsCfg:
         },
     )
     feet_clearance = RewTerm(
-        func=mdp.foot_clearance_reward,
+        func=mdp.foot_clearance_reward_rough,
         weight=1.0,
         params={
             "std": 0.05,
             "tanh_mult": 2.0,
             "target_height": 0.1,
+            "sensor_cfg": SceneEntityCfg("height_scanner"),
+            "max_ground_distance": 0.2,
             "asset_cfg": SceneEntityCfg("robot", body_names=".*ankle_roll.*"),
         },
     )
