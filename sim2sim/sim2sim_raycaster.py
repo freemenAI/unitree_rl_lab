@@ -216,7 +216,7 @@ class RaycasterSim2Sim:
             imu_quat, np.array([0.0, 0.0, -1.0], dtype=np.float32)
         ).astype(np.float32)
         velocity_commands = self.command.copy()
-        # 关节顺序从 sdk 顺序重新排列成 policy 训练时的 asset 顺序
+        # Reorder the joints from the SDK order to match the asset order used during policy training.
         joint_pos_asset = joint_pos_sdk[self.asset_to_sdk]
         joint_vel_asset = joint_vel_sdk[self.asset_to_sdk]
         last_action = self.last_action.copy()
@@ -241,7 +241,7 @@ class RaycasterSim2Sim:
         return cur_obs_terms
 
     def get_history_obs(self) -> np.ndarray:
-        # 把每个观测项的历史帧按顺序拼成一个一维数组，作为 policy 的最终输入 obs
+        # 將每個觀測項目的歷史幀依序拼接成一個一維陣列，作為 policy 最終的輸入 obs
         history_obs = []
         for name in self.observation_terms:
             for obs_frame in self.history[name]:

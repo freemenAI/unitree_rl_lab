@@ -16,7 +16,7 @@ ROBOT_SCENE = os.path.join(ASSETS_DIR, "scene_rough.xml")
 
 RAYCASTER_PLUGIN_LIBRARY = "/home/gyrobot/projects/mujoco/build/lib/libsensor_raycaster.so"
 
-POLICY_PATH = os.path.join(TRAIN_RUN_DIR, "model_9200.pt")
+POLICY_PATH = os.path.join(TRAIN_RUN_DIR, "model_12599.pt")
 #POLICY_PATH = os.path.join(TRAIN_RUN_DIR, "exported", "policy.pt")
 DEPLOY_CONFIG = os.path.join(TRAIN_RUN_DIR, "params", "deploy.yaml")
 
