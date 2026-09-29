@@ -64,6 +64,22 @@ def upward(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("r
     return reward
 
 
+def base_height_l2_valid_rays(
+    env: ManagerBasedRLEnv,
+    target_height: float,
+    sensor_cfg: SceneEntityCfg,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize terrain-relative height using valid rays; skip when all rays miss."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    heights = env.scene[sensor_cfg.name].data.ray_hits_w[..., 2]
+    valid = torch.isfinite(heights)
+    count = valid.sum(dim=1)
+    terrain_height = torch.where(valid, heights, 0.0).sum(dim=1) / count.clamp_min(1)
+    penalty = torch.square(asset.data.root_pos_w[:, 2] - target_height - terrain_height)
+    return torch.where(count > 0, penalty, 0.0)
+
+
 def joint_position_penalty(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, stand_still_scale: float, velocity_threshold: float
 ) -> torch.Tensor:
@@ -126,6 +142,40 @@ def foot_clearance_reward(
     foot_velocity_tanh = torch.tanh(tanh_mult * torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2))
     reward = foot_z_target_error * foot_velocity_tanh
     return torch.exp(-torch.sum(reward, dim=1) / std)
+
+
+def foot_clearance_reward_rough(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    sensor_cfg: SceneEntityCfg,
+    target_height: float,
+    std: float,
+    tanh_mult: float,
+    max_ground_distance: float = 0.2,
+) -> torch.Tensor:
+    """Reward clearance above the nearest valid scan hit in XY for each foot.
+
+    Return zero for environments where any foot lacks a hit within
+    ``max_ground_distance`` meters, rather than rewarding unknown clearance.
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    foot_pos = asset.data.body_pos_w[:, asset_cfg.body_ids, :]  # (envs, feet, 3)
+    ray_hits = env.scene[sensor_cfg.name].data.ray_hits_w  # (envs, rays, 3)
+    valid = torch.isfinite(ray_hits).all(dim=-1)
+    safe_hits = torch.where(valid.unsqueeze(-1), ray_hits, 0.0)
+    distance_sq = torch.sum(torch.square(foot_pos[:, :, None, :2] - safe_hits[:, None, :, :2]), dim=-1)
+    distance_sq = distance_sq.masked_fill(~valid[:, None, :], float("inf"))
+    nearest_distance_sq, nearest_idx = distance_sq.min(dim=-1)
+    ground_height = safe_hits[:, :, 2].gather(1, nearest_idx)
+    has_ground = nearest_distance_sq <= max_ground_distance**2
+
+    clearance = foot_pos[:, :, 2] - ground_height
+    foot_z_target_error = torch.square(clearance - target_height)
+    foot_velocity_tanh = torch.tanh(
+        tanh_mult * torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2)
+    )
+    reward = torch.exp(-torch.sum(foot_z_target_error * foot_velocity_tanh, dim=1) / std)
+    return torch.where(has_ground.all(dim=1), reward, 0.0)
 
 
 def feet_too_near(
